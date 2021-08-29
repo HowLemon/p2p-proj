@@ -1,6 +1,7 @@
 import './App.css';
 import React from 'react';
 import RandomNames from './randomName';
+import Session from './session';
 
 
 class App extends React.Component {
@@ -26,7 +27,10 @@ class App extends React.Component {
   render() {
     return (
       <div className="App">
-        {this.state.id ? <ModeSelect/> : <Login getLoginInfo={this.getLoginInfo} />}
+        {
+        //this.state.id ? <ModeSelect/> : <Login getLoginInfo={this.getLoginInfo} />
+        }
+        <Session/>
       </div>
     );
   }
@@ -83,9 +87,6 @@ class ModeSelect extends React.Component {
   }
 }
 
-class Session extends React.Component {
-  
-}
 
 
 export default App;
