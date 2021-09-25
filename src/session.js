@@ -6,7 +6,8 @@ var dataTypes = {
     requestConnect: 1,
     face: 2,
     debug: 4,
-    ping: 5
+    ping: 5,
+    cursor: 6
 }
 
 class Session extends React.Component {
@@ -31,6 +32,7 @@ class Session extends React.Component {
         this.requestConnect = this.requestConnect.bind(this);
         this.dataConnectionHandlers = this.handleDataConnection.bind(this);
         this.handleStreamInput = this.handleStreamInput.bind(this);
+        this.activateCapture = this.activateCapture.bind(this);
 
         this.chatContent = null;
         this.hostConn = null;
@@ -90,7 +92,10 @@ class Session extends React.Component {
     }
 
     activateCapture(){
-        
+        var capture = navigator.mediaDevices.getDisplayMedia({audio: true, video: true});
+        capture.then((s)=>{
+            this.stream = s;
+        });
     }
 
     requestConnect(session) {
@@ -173,6 +178,9 @@ class Session extends React.Component {
                 case (dataTypes.debug):
                     console.log(timeConverter(data.timestamp), data.content, conn.metadata);
                     break;
+                case (dataTypes.cursor):
+                    
+                    break;
                 default:
                     console.log("NO TYPE", data);
                     break;
@@ -251,7 +259,7 @@ class Session extends React.Component {
     render() {
         return (
             <div className="container">
-                <Videoframe callers={this.state.callList} />
+                <Videoframe screenShareInvoker={this.activateCapture} callers={this.state.callList} />
                 <div className="chat-room">
                     <div>
                         <Chats setRef={this.setChatContentRef} items={this.state.chats} />
@@ -313,7 +321,7 @@ class Videoframe extends React.Component {
 
                 <div className="controller">
                     <button id="video">📷</button>
-                    <button id="screenshare">💻</button>
+                    <button onClick={this.props.screenShareInvoker} id="screenshare">💻</button>
                     <button id="mic">🎤</button>
                     <button id="hang">❌</button>
                     <button id="settings">⚙️</button>
