@@ -1,5 +1,8 @@
 import React from 'react';
 import Peer from 'peerjs';
+import Chats from './chatroom';
+import Videoframe from './videoFrame';
+import * as util from './utils';
 
 var dataTypes = {
     message: 0,
@@ -9,6 +12,9 @@ var dataTypes = {
     ping: 5,
     cursor: 6
 }
+
+//atm UI control and peerjs API control are mixed up
+//TODO separate those two
 
 class Session extends React.Component {
     constructor(props) {
@@ -39,8 +45,19 @@ class Session extends React.Component {
         this.connList = [];
 
         this.userMedia = null;
+
+        //video/audio stream output
         this.stream = null;
 
+        //video solo stream output
+        this.camStream = null;
+
+        //audio solo stream output
+        this.audioStream = null;
+
+
+        //notify connector when closing the window
+        //not very reliable atm
         window.addEventListener("beforeunload", (ev) => {
             ev.preventDefault();
             this.state.peer.disconnect();
@@ -48,6 +65,7 @@ class Session extends React.Component {
         });
     }
 
+    // reactjs want me to do this shit
     setChatContentRef(child) {
         this.chatContent = child
     }
@@ -82,6 +100,8 @@ class Session extends React.Component {
         });
     }
 
+    //activate the A/V stream
+    //TODO: separate audio and video and make it toggable
     activateMedia() {
         this.userMedia = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia;
         this.userMedia({ video: true, audio: true }, (stream) => {
@@ -91,13 +111,16 @@ class Session extends React.Component {
         })
     }
 
-    activateCapture(){
-        var capture = navigator.mediaDevices.getDisplayMedia({audio: true, video: true});
-        capture.then((s)=>{
+    //  WIP
+    //  activate the WEBGL capture stream
+    activateCapture() {
+        var capture = navigator.mediaDevices.getDisplayMedia({ audio: true, video: true });
+        capture.then((s) => {
             this.stream = s;
         });
     }
 
+    // requesting connection to other session ID
     requestConnect(session) {
         var conn = this.state.peer.connect(session, { metadata: { name: this.props.name } });
 
@@ -112,7 +135,8 @@ class Session extends React.Component {
     }
 
 
-
+    // handles individual connector's calling input
+    // WIP need to be able to tell apart types of call (audio/video/capture/others)
     handleStreamInput(call) {
         console.log("handling call")
         call.on('stream', (remoteStream) => {
@@ -137,15 +161,17 @@ class Session extends React.Component {
 
     }
 
+
+    // handles individual connector's data input
     handleDataConnection(conn) {
 
 
         conn.on("open", () => {
             if (conn.peer === this.props.session) { this.generateChatMessage("connected to host", "system", Date.now()); }
-            conn.send(generatePayload("hi", dataTypes.debug));
+            conn.send(util.generatePayload("hi", dataTypes.debug));
             if (this.props.session === "") { //if this instance is host
                 console.log("sending conn info", this.connList);
-                conn.send(generatePayload(this.connList.map(x => x.peer), dataTypes.requestConnect));
+                conn.send(util.generatePayload(this.connList.map(x => x.peer), dataTypes.requestConnect));
             }
             this.setState({
                 connectors: this.state.connectors + 1
@@ -176,10 +202,10 @@ class Session extends React.Component {
                     this.generateChatMessage(data.content, "other", data.timestamp, data.sender);
                     break;
                 case (dataTypes.debug):
-                    console.log(timeConverter(data.timestamp), data.content, conn.metadata);
+                    console.log(util.timeConverter(data.timestamp), data.content, conn.metadata);
                     break;
                 case (dataTypes.cursor):
-                    
+
                     break;
                 default:
                     console.log("NO TYPE", data);
@@ -190,6 +216,8 @@ class Session extends React.Component {
 
         this.connList.push(conn);
     }
+
+    //UI controls
 
     handleTextboxEnter(e) {
         if (e.key === 'Enter') {
@@ -221,7 +249,7 @@ class Session extends React.Component {
 
         //send the message to other connectors
         this.connList.forEach(conn => {
-            conn.send(generatePayload(this.state.inputMessage, dataTypes.message, this.props.name));
+            conn.send(util.generatePayload(this.state.inputMessage, dataTypes.message, this.props.name));
         })
 
         this.setState({
@@ -256,6 +284,8 @@ class Session extends React.Component {
         }
     }
 
+
+
     render() {
         return (
             <div className="container">
@@ -274,124 +304,12 @@ class Session extends React.Component {
     }
 }
 
-class Chats extends React.Component {
-
-    render() {
-        return (
-            <div className="chat-content" ref={el => { this.props.setRef(el) }}>
-                {
-                    this.props.items.map(
-                        item => (
-                            <div key={"m-" + item.timestamp} className={"item " + item.type}>
-                                <div data-owner={item.owner} data-timestamp={timeConverter(item.timestamp)} className={`msg`}>{item.message}</div>
-                            </div>
-                        )
-                    )
-                }
-            </div>
-        )
-    }
-}
-
-class Videoframe extends React.Component {
-
-    constructor(props) {
-        super(props);
-        this.controlBoard = this.controlBoard.bind(this);
-        this.display = this.display.bind(this);
-    }
-
-    display() {
-        return (
-            <div className="display">
-                {
-                    this.props.callers ? this.props.callers.map(e => (
-                        <VideoItem key={e.id} stream={e} />
-                    )) : "noitem"
-                }
-            </div>
-        );
-    }
 
 
-
-    controlBoard() {
-        return (
-            <div className="control-board">
-
-                <div className="controller">
-                    <button id="video">📷</button>
-                    <button onClick={this.props.screenShareInvoker} id="screenshare">💻</button>
-                    <button id="mic">🎤</button>
-                    <button id="hang">❌</button>
-                    <button id="settings">⚙️</button>
-                </div>
-            </div>
-        );
-    }
-
-    render() {
-        return (
-            <div className="video-frame">
-                {this.display()}
-                {this.controlBoard()}
-            </div>
-        )
-    }
-}
-
-class VideoItem extends React.Component {
-    constructor(props){
-        super(props);
-        this.videoRef = React.createRef(); 
-    }
-
-    componentDidMount(){
-        this.videoRef.current.srcObject = this.props.stream;
-        this.videoRef.current.onloadedmetadata = ((video)=>{return (e)=>{
-            video.play();
-        }})(this.videoRef.current);
-        this.videoRef.current.oninactive = ((video)=>{return (e)=>{
-            alert("bye");
-        }})(this.videoRef.current);
-    }
-    
-    render() {
-        return (
-            <div className="item">
-                <video ref={this.videoRef}></video>
-            </div>
-        )
-    }
-}
 
 //utils
 
-function timeConverter(UNIX_timestamp) {
-    var a = new Date(UNIX_timestamp);
-    var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    var year = a.getFullYear();
-    var month = months[a.getMonth()];
-    var date = a.getDate();
-    var hour = a.getHours();
-    var min = a.getMinutes();
-    var sec = a.getSeconds();
-    var time = date + ' ' + month + ' ' + year + ' ' + zerofill(hour) + ':' + zerofill(min) + ':' + zerofill(sec);
-    return time;
-}
 
-function zerofill(str) {
-    return ('00' + str).slice(-2);
-}
-
-function generatePayload(content, type, sender, timestamp = Date.now()) {
-    return {
-        content: content,
-        type: type,
-        timestamp: timestamp,
-        sender: sender
-    }
-}
 
 
 function generateNewPeer() {
